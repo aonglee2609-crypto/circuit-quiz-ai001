@@ -16,10 +16,66 @@ function search(){const raw=$('ocr').value.trim();if(!raw){$('status').textConte
 const best=ranked[0];$('result').innerHTML='';if(!best||best.score<.18){$('status').textContent='ยังจับคู่โจทย์ไม่ได้ชัดเจน ลองจัดกล้องให้ตรงหรือพิมพ์ข้อความเพิ่ม';return}
 $('status').textContent=`พบรายการใกล้เคียง ${ranked.filter(x=>x.score>=Math.max(.18,best.score-.08)).length} ข้อ จากทั้งหมด ${QUESTIONS.length}`;
 ranked.slice(0,3).forEach((item,i)=>{const q=item.q, card=document.createElement('div');card.className='panel';card.style.marginTop='10px';card.innerHTML=`<div class="tag">ข้อ ${q.id} · ${q.tag||'ไม่ระบุหมวด'} · ความตรงกันโดยประมาณ ${(item.score*100).toFixed(0)}%</div><div class="qtitle"></div><div class="opts"></div><div class="muted explain"></div>`;card.querySelector('.qtitle').textContent=q.q;const opts=card.querySelector('.opts');q.c.forEach((c,j)=>{const d=document.createElement('div');d.className='choice'+(j===q.a?' correct':'');d.textContent=['ก','ข','ค','ง'][j]+'. '+c+(j===q.a?'  ✓ เฉลยในคลัง':'');opts.appendChild(d)});card.querySelector('.explain').textContent=q.e?'คำอธิบาย: '+q.e:'';$('result').appendChild(card)})}
-let stream = null;
-let busy = false;
+
+  async function scan(){
+  if(!stream || busy) return;
+
+  busy = true;
+
+  try {
+    $('camstatus').textContent = 'กำลังอ่านข้อความจากกล้อง...';
+
+    const video = $('video');
+
+    if(!video.videoWidth || !video.videoHeight){
+      throw new Error('กล้องยังไม่พร้อม กรุณารอสักครู่');
+    }
+
+    if(!window.Tesseract){
+      throw new Error('โหลดระบบ OCR ไม่สำเร็จ กรุณาตรวจสอบอินเทอร์เน็ต');
+    }
+
+    const canvas = document.createElement('canvas');
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+
+    const ctx = canvas.getContext('2d');
+    ctx.drawImage(video, 0, 0);
+
+    const result = await Tesseract.recognize(
+      canvas,
+      'tha+eng',
+      {
+        logger: info => {
+          if(info.status === 'recognizing text'){
+            $('camstatus').textContent =
+              'กำลังอ่านข้อความ ' +
+              Math.round(info.progress * 100) + '%';
+          }
+        }
+      }
+    );
+
+    const text = result.data.text.trim();
+
+    if(text){
+      $('ocr').value = text;
+      $('camstatus').textContent = 'อ่านข้อความสำเร็จแล้ว';
+      search();
+    }else{
+      $('camstatus').textContent = 'ไม่พบข้อความ กรุณาลองใหม่';
+    }
+
+  }catch(e){
+    $('camstatus').textContent =
+      'OCR เกิดข้อผิดพลาด: ' + e.message;
+  }finally{
+    busy = false;
+  }
+}
 async function startCamera(){
   try {
+
     $('camstatus').textContent = 'กำลังเปิดกล้อง...';
 
     if(!navigator.mediaDevices ||
@@ -50,13 +106,6 @@ async function startCamera(){
   }
 }
 
-  }catch(e){
-    $('camstatus').textContent =
-      'OCR เกิดข้อผิดพลาด: ' + e.message;
-  }finally{
-    busy = false;
-  }
-}
 
 $('stop').onclick=()=>{
   if(stream) stream.getTracks().forEach(t=>t.stop());
