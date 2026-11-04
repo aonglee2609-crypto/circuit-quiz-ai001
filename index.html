@@ -16,47 +16,39 @@ function search(){const raw=$('ocr').value.trim();if(!raw){$('status').textConte
 const best=ranked[0];$('result').innerHTML='';if(!best||best.score<.18){$('status').textContent='ยังจับคู่โจทย์ไม่ได้ชัดเจน ลองจัดกล้องให้ตรงหรือพิมพ์ข้อความเพิ่ม';return}
 $('status').textContent=`พบรายการใกล้เคียง ${ranked.filter(x=>x.score>=Math.max(.18,best.score-.08)).length} ข้อ จากทั้งหมด ${QUESTIONS.length}`;
 ranked.slice(0,3).forEach((item,i)=>{const q=item.q, card=document.createElement('div');card.className='panel';card.style.marginTop='10px';card.innerHTML=`<div class="tag">ข้อ ${q.id} · ${q.tag||'ไม่ระบุหมวด'} · ความตรงกันโดยประมาณ ${(item.score*100).toFixed(0)}%</div><div class="qtitle"></div><div class="opts"></div><div class="muted explain"></div>`;card.querySelector('.qtitle').textContent=q.q;const opts=card.querySelector('.opts');q.c.forEach((c,j)=>{const d=document.createElement('div');d.className='choice'+(j===q.a?' correct':'');d.textContent=['ก','ข','ค','ง'][j]+'. '+c+(j===q.a?'  ✓ เฉลยในคลัง':'');opts.appendChild(d)});card.querySelector('.explain').textContent=q.e?'คำอธิบาย: '+q.e:'';$('result').appendChild(card)})}
-async function scan(){
-  if(!stream || busy) return;
 
-  busy = true;
-
+async function startCamera(){
   try {
-    $('camstatus').textContent = 'กำลังอ่านข้อความจากกล้อง...';
+    $('camstatus').textContent = 'กำลังเปิดกล้อง...';
 
-    const video = $('video');
-
-    const canvas = document.createElement('canvas');
-    canvas.width = video.videoWidth;
-    canvas.height = video.videoHeight;
-
-    const ctx = canvas.getContext('2d');
-    ctx.drawImage(video, 0, 0);
-
-    const result = await Tesseract.recognize(
-      canvas,
-      'tha+eng',
-      {
-        logger: m => {
-          if(m.status === 'recognizing text'){
-            $('camstatus').textContent =
-              'กำลังอ่านข้อความ ' +
-              Math.round(m.progress * 100) + '%';
-          }
-        }
-      }
-    );
-
-    const text = result.data.text.trim();
-
-    if(text){
-      $('ocr').value = text;
-      search();
-      $('camstatus').textContent = 'อ่านข้อความสำเร็จแล้ว';
-    }else{
-      $('camstatus').textContent =
-        'ไม่พบข้อความ กรุณาปรับแสงหรือระยะกล้อง';
+    if(!navigator.mediaDevices ||
+       !navigator.mediaDevices.getUserMedia){
+      throw new Error('เบราว์เซอร์ไม่รองรับกล้อง');
     }
+
+    stream = await navigator.mediaDevices.getUserMedia({
+      video: {
+        facingMode: { ideal: 'environment' }
+      },
+      audio: false
+    });
+
+    $('video').srcObject = stream;
+    await $('video').play();
+
+    $('placeholder').style.display = 'none';
+    $('start').disabled = true;
+    $('stop').disabled = false;
+    $('scan').disabled = false;
+
+    $('camstatus').textContent = 'เปิดกล้องสำเร็จ';
+
+  } catch(e) {
+    $('camstatus').textContent =
+      'เปิดกล้องไม่สำเร็จ: ' + e.message;
+  }
+}
+
 
   }catch(e){
     $('camstatus').textContent =
@@ -66,5 +58,5 @@ async function scan(){
   }
 }
 $('stop').onclick=()=>{if(stream)stream.getTracks().forEach(t=>t.stop());stream=null;$('video').srcObject=null;$('placeholder').style.display='grid';$('stop').disabled=true;$('scan').disabled=true;$('camstatus').textContent='ปิดกล้องแล้ว'};
-$('scan').onclick=scan;$('find').onclick=search;$('clear').onclick=()=>{$('ocr').value='';$('result').innerHTML='';$('status').textContent='ล้างข้อความแล้ว'};
+$('start').onclick=startCamera;$('scan').onclick=scan;$('find').onclick=search;$('clear').onclick=()=>{$('ocr').value='';$('result').innerHTML='';$('status').textContent='ล้างข้อความแล้ว'};
 </script></body></html>
