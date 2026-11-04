@@ -16,7 +16,8 @@ function search(){const raw=$('ocr').value.trim();if(!raw){$('status').textConte
 const best=ranked[0];$('result').innerHTML='';if(!best||best.score<.18){$('status').textContent='ยังจับคู่โจทย์ไม่ได้ชัดเจน ลองจัดกล้องให้ตรงหรือพิมพ์ข้อความเพิ่ม';return}
 $('status').textContent=`พบรายการใกล้เคียง ${ranked.filter(x=>x.score>=Math.max(.18,best.score-.08)).length} ข้อ จากทั้งหมด ${QUESTIONS.length}`;
 ranked.slice(0,3).forEach((item,i)=>{const q=item.q, card=document.createElement('div');card.className='panel';card.style.marginTop='10px';card.innerHTML=`<div class="tag">ข้อ ${q.id} · ${q.tag||'ไม่ระบุหมวด'} · ความตรงกันโดยประมาณ ${(item.score*100).toFixed(0)}%</div><div class="qtitle"></div><div class="opts"></div><div class="muted explain"></div>`;card.querySelector('.qtitle').textContent=q.q;const opts=card.querySelector('.opts');q.c.forEach((c,j)=>{const d=document.createElement('div');d.className='choice'+(j===q.a?' correct':'');d.textContent=['ก','ข','ค','ง'][j]+'. '+c+(j===q.a?'  ✓ เฉลยในคลัง':'');opts.appendChild(d)});card.querySelector('.explain').textContent=q.e?'คำอธิบาย: '+q.e:'';$('result').appendChild(card)})}
-
+let stream = null;
+let busy = false;
 async function startCamera(){
   try {
     $('camstatus').textContent = 'กำลังเปิดกล้อง...';
@@ -49,7 +50,6 @@ async function startCamera(){
   }
 }
 
-
   }catch(e){
     $('camstatus').textContent =
       'OCR เกิดข้อผิดพลาด: ' + e.message;
@@ -57,6 +57,26 @@ async function startCamera(){
     busy = false;
   }
 }
-$('stop').onclick=()=>{if(stream)stream.getTracks().forEach(t=>t.stop());stream=null;$('video').srcObject=null;$('placeholder').style.display='grid';$('stop').disabled=true;$('scan').disabled=true;$('camstatus').textContent='ปิดกล้องแล้ว'};
-$('start').onclick=startCamera;$('scan').onclick=scan;$('find').onclick=search;$('clear').onclick=()=>{$('ocr').value='';$('result').innerHTML='';$('status').textContent='ล้างข้อความแล้ว'};
-</script></body></html>
+
+$('stop').onclick=()=>{
+  if(stream) stream.getTracks().forEach(t=>t.stop());
+  stream=null;
+  $('video').srcObject=null;
+  $('placeholder').style.display='grid';
+  $('start').disabled=false;
+  $('stop').disabled=true;
+  $('scan').disabled=true;
+  $('camstatus').textContent='ปิดกล้องแล้ว';
+};
+
+$('start').onclick=startCamera;
+$('scan').onclick=scan;
+$('find').onclick=search;
+$('clear').onclick=()=>{
+  $('ocr').value='';
+  $('result').innerHTML='';
+  $('status').textContent='ล้างข้อความแล้ว';
+};
+</script>
+</body>
+</html>
